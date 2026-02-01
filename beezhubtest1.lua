@@ -1,12 +1,11 @@
--- BeeZ Hub v2.0 - Complete Farming System với Toggle UI
+-- BeeZ Hub v2.0 - Fixed với Toggle UI hoạt động và Farming dễ dùng
 -- Works on Delta, Xeno, Synapse, etc.
 
 -- Services
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local VirtualUser = game:GetService("VirtualUser")
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
 
 -- Variables
 local Player = Players.LocalPlayer
@@ -17,38 +16,18 @@ local Humanoid = Character:WaitForChild("Humanoid")
 -- Configuration
 local Config = {
     AutoFarm = false,
-    FarmMethod = "Normal",
     FarmDistance = 25,
     FarmPriority = "Nearest",
     StackFarming = false,
     StackCount = 3,
-    FarmOnlyBosses = false,
-    SkipLowLevel = false,
-    LevelThreshold = 50,
-    
-    -- Auto Features
-    AutoKatakuri = false,
-    AutoBone = false,
-    AutoTyrant = false,
-    AutoHop = false,
-    MaxHops = 10,
-    AutoHealthPot = false,
-    HealthThreshold = 30,
-    AutoEnergyPot = false,
-    EnergyThreshold = 20,
     
     -- Safety
     SafeMode = true,
     AntiAfk = true,
-    Humanizer = true,
-    RandomBreaks = true,
-    FarmTimeLimit = 1800,
     
     -- Skills
     PrimarySkill = "Z",
     SecondarySkill = "X",
-    UseSkillCombo = true,
-    MasteryTarget = 300,
     
     -- UI
     UIVisible = true,
@@ -57,19 +36,13 @@ local Config = {
 
 -- Farming Variables
 local FarmEnabled = false
-local CurrentTargets = {}
-local HopAttempts = 0
-local EnemiesKilled = 0
-local FarmStartTime = 0
-local SkillCooldowns = {}
 local ToggleIcon = nil
 local BeeZ_GUI = nil
+local UIEnabled = true
+local FarmingLoop = nil
 
--- Load Kavo UI
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-
--- ==================== TOGGLE ICON ====================
-local function CreateToggleIcon()
+-- ==================== SIMPLE TOGGLE UI ====================
+local function CreateSimpleToggleIcon()
     if ToggleIcon then ToggleIcon:Destroy() end
     
     local IconGui = Instance.new("ScreenGui")
@@ -79,10 +52,10 @@ local function CreateToggleIcon()
     
     local IconFrame = Instance.new("Frame")
     IconFrame.Name = "ToggleIcon"
-    IconFrame.Size = UDim2.new(0, 50, 0, 50)
-    IconFrame.Position = UDim2.new(0, 20, 0.5, -25)
+    IconFrame.Size = UDim2.new(0, 40, 0, 40)
+    IconFrame.Position = UDim2.new(0, 10, 0.5, -20)
     IconFrame.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
-    IconFrame.BackgroundTransparency = 0.3
+    IconFrame.BackgroundTransparency = 0.2
     IconFrame.BorderSizePixel = 0
     IconFrame.Parent = IconGui
     
@@ -96,9 +69,10 @@ local function CreateToggleIcon()
     IconLabel.Text = "🐝"
     IconLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     IconLabel.Font = Enum.Font.GothamBold
-    IconLabel.TextSize = 24
+    IconLabel.TextSize = 20
     IconLabel.Parent = IconFrame
     
+    -- Simple click to toggle
     IconFrame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             ToggleUI()
@@ -111,50 +85,57 @@ end
 
 local function ToggleUI()
     if BeeZ_GUI then
-        Config.UIVisible = not Config.UIVisible
-        BeeZ_GUI:ToggleUI()
-        
-        if ToggleIcon then
-            local iconFrame = ToggleIcon:FindFirstChild("ToggleIcon")
-            if iconFrame then
-                local iconLabel = iconFrame:FindFirstChildOfClass("TextLabel")
-                if iconLabel then
-                    if Config.UIVisible then
-                        iconFrame.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
-                        iconLabel.Text = "🐝"
-                    else
-                        iconFrame.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-                        iconLabel.Text = "🔒"
+        -- Tìm MainWindow để toggle
+        for _, obj in pairs(game.CoreGui:GetChildren()) do
+            if obj.Name == "Kavo" then
+                UIEnabled = not UIEnabled
+                obj.Enabled = UIEnabled
+                
+                -- Update icon
+                if ToggleIcon then
+                    local iconFrame = ToggleIcon:FindFirstChild("ToggleIcon")
+                    if iconFrame then
+                        if UIEnabled then
+                            iconFrame.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+                            IconLabel.Text = "🐝"
+                        else
+                            iconFrame.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+                            IconLabel.Text = "🔒"
+                        end
                     end
                 end
+                
+                Notify("UI " .. (UIEnabled and "BẬT" or "TẮT"))
+                break
             end
         end
-        
-        Notify("UI " .. (Config.UIVisible and "SHOWN" or "HIDDEN"))
     end
 end
 
--- ==================== NOTIFICATION ====================
+-- ==================== SIMPLE NOTIFICATION ====================
 local function Notify(message, duration)
     if Config.Notifications then
         game.StarterGui:SetCore("SendNotification", {
             Title = "🐝 BeeZ Hub",
             Text = message,
             Duration = duration or 2,
-            Icon = "rbxassetid://6723928013"
         })
     end
 end
 
--- ==================== FARMING FUNCTIONS ====================
-local function GetEnemiesInRange(distance)
+-- ==================== SIMPLE FARMING SYSTEM ====================
+local function GetNearbyEnemies()
     local enemies = {}
     for _, npc in pairs(Workspace.Enemies:GetChildren()) do
         if npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Humanoid") then
             if npc.Humanoid.Health > 0 then
-                local distanceToNPC = (HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
-                if distanceToNPC <= distance then
-                    table.insert(enemies, npc)
+                local distance = (HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
+                if distance <= Config.FarmDistance then
+                    table.insert(enemies, {
+                        NPC = npc,
+                        Distance = distance,
+                        Health = npc.Humanoid.Health
+                    })
                 end
             end
         end
@@ -162,316 +143,273 @@ local function GetEnemiesInRange(distance)
     return enemies
 end
 
-local function SelectTarget(enemies)
-    if #enemies == 0 then return {} end
+local function AttackEnemy(enemy)
+    if not enemy or not enemy.NPC then return end
     
-    if Config.FarmPriority == "Nearest" then
-        table.sort(enemies, function(a, b)
-            return (HumanoidRootPart.Position - a.HumanoidRootPart.Position).Magnitude <
-                   (HumanoidRootPart.Position - b.HumanoidRootPart.Position).Magnitude
-        end)
-    elseif Config.FarmPriority == "Lowest HP" then
-        table.sort(enemies, function(a, b)
-            return a.Humanoid.Health < b.Humanoid.Health
-        end)
-    end
+    -- Move to enemy
+    HumanoidRootPart.CFrame = CFrame.new(
+        enemy.NPC.HumanoidRootPart.Position + Vector3.new(0, 3, 0)
+    )
     
-    local targets = {}
-    local maxTargets = Config.StackFarming and Config.StackCount or 1
+    -- Use skills
+    game:GetService("VirtualInputManager"):SendKeyEvent(true, Config.PrimarySkill, false, game)
+    task.wait(0.1)
+    game:GetService("VirtualInputManager"):SendKeyEvent(false, Config.PrimarySkill, false, game)
     
-    for i = 1, math.min(maxTargets, #enemies) do
-        table.insert(targets, enemies[i])
-    end
+    game:GetService("VirtualInputManager"):SendKeyEvent(true, Config.SecondarySkill, false, game)
+    task.wait(0.1)
+    game:GetService("VirtualInputManager"):SendKeyEvent(false, Config.SecondarySkill, false, game)
     
-    return targets
+    -- Basic attack
+    game:GetService("VirtualInputManager"):SendKeyEvent(true, "LeftControl", false, game)
+    task.wait(0.1)
+    game:GetService("VirtualInputManager"):SendKeyEvent(false, "LeftControl", false, game)
 end
 
-local function UseSkill(skill)
-    if skill and not SkillCooldowns[skill] then
-        game:GetService("VirtualInputManager"):SendKeyEvent(true, skill, false, game)
-        task.wait(0.1)
-        game:GetService("VirtualInputManager"):SendKeyEvent(false, skill, false, game)
-        
-        SkillCooldowns[skill] = true
-        task.wait(0.5)
-        SkillCooldowns[skill] = false
-    end
-end
-
-local function FarmingCycle()
-    if Config.AntiAfk then
-        VirtualUser:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-        task.wait(1)
-        VirtualUser:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
-    end
-    
-    local enemies = GetEnemiesInRange(Config.FarmDistance)
-    local targets = SelectTarget(enemies)
-    
-    if #targets > 0 then
-        -- Move to first target
-        HumanoidRootPart.CFrame = CFrame.new(targets[1].HumanoidRootPart.Position + Vector3.new(0, 3, 0))
-        
-        -- Use skills
-        UseSkill(Config.PrimarySkill)
-        if Config.UseSkillCombo then
-            UseSkill(Config.SecondarySkill)
+local function SimpleFarmingLoop()
+    while FarmEnabled do
+        if Config.AntiAfk then
+            VirtualUser:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+            task.wait(1)
+            VirtualUser:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
         end
         
-        -- Auto click for basic attack
-        game:GetService("VirtualInputManager"):SendKeyEvent(true, "LeftControl", false, game)
-        task.wait(0.1)
-        game:GetService("VirtualInputManager"):SendKeyEvent(false, "LeftControl", false, game)
+        local enemies = GetNearbyEnemies()
         
-        EnemiesKilled = EnemiesKilled + 1
-        if StatusLabel then
-            StatusLabel:UpdateLabel("Status: 🟢 Farming | Kills: " .. EnemiesKilled)
+        if #enemies > 0 then
+            -- Sort by priority
+            if Config.FarmPriority == "Nearest" then
+                table.sort(enemies, function(a, b)
+                    return a.Distance < b.Distance
+                end)
+            elseif Config.FarmPriority == "Lowest HP" then
+                table.sort(enemies, function(a, b)
+                    return a.Health < b.Health
+                end)
+            end
+            
+            -- Attack enemies
+            local attackCount = Config.StackFarming and math.min(Config.StackCount, #enemies) or 1
+            
+            for i = 1, attackCount do
+                if enemies[i] then
+                    AttackEnemy(enemies[i])
+                end
+            end
+            
+            -- Update status
+            if FarmingStatusLabel then
+                FarmingStatusLabel:UpdateLabel("🟢 Farming | Enemies: " .. #enemies)
+            end
+        else
+            if FarmingStatusLabel then
+                FarmingStatusLabel:UpdateLabel("🟡 No enemies found")
+            end
         end
-    else
-        if Config.AutoHop and HopAttempts < Config.MaxHops then
-            HopAttempts = HopAttempts + 1
-            Notify("No enemies, hopping... (" .. HopAttempts .. "/" .. Config.MaxHops .. ")")
+        
+        -- Safe mode delay
+        if Config.SafeMode then
+            task.wait(0.5)
+        else
+            task.wait(0.2)
         end
-    end
-    
-    -- Humanizer breaks
-    if Config.SafeMode and Config.RandomBreaks and math.random(1, 100) <= 5 then
-        local breakTime = math.random(2, 5)
-        Notify("Taking break: " .. breakTime .. "s")
-        task.wait(breakTime)
-    end
-    
-    -- Check time limit
-    if Config.FarmTimeLimit > 0 and (tick() - FarmStartTime) > Config.FarmTimeLimit then
-        Notify("⏰ Time limit reached!")
-        FarmEnabled = false
-        Config.AutoFarm = false
     end
 end
 
 local function StartFarming()
-    if FarmEnabled then return end
-    
-    FarmEnabled = true
-    FarmStartTime = tick()
-    EnemiesKilled = 0
-    HopAttempts = 0
-    
-    Notify("🚀 FARMING STARTED!\nMethod: " .. Config.FarmMethod, 3)
-    if StatusLabel then
-        StatusLabel:UpdateLabel("Status: 🟢 Farming | Kills: 0")
+    if FarmEnabled then
+        Notify("Farming đã chạy rồi!")
+        return
     end
     
-    coroutine.wrap(function()
-        while FarmEnabled and Config.AutoFarm do
-            FarmingCycle()
-            task.wait(0.2)
-        end
-    end)()
+    FarmEnabled = true
+    Notify("🚀 Bắt đầu Farming!", 2)
+    
+    if FarmingStatusLabel then
+        FarmingStatusLabel:UpdateLabel("🟢 Đang Farming...")
+    end
+    
+    -- Start farming loop
+    FarmingLoop = coroutine.create(SimpleFarmingLoop)
+    coroutine.resume(FarmingLoop)
 end
 
 local function StopFarming()
-    FarmEnabled = false
-    local farmTime = tick() - FarmStartTime
-    local minutes = math.floor(farmTime / 60)
-    local seconds = math.floor(farmTime % 60)
+    if not FarmEnabled then
+        Notify("Farming chưa chạy!")
+        return
+    end
     
-    Notify(string.format("⏹️ FARMING STOPPED!\nTime: %d:%02d\nKills: %d", minutes, seconds, EnemiesKilled), 3)
-    if StatusLabel then
-        StatusLabel:UpdateLabel("Status: 🔴 Stopped | Kills: " .. EnemiesKilled)
+    FarmEnabled = false
+    Notify("⏹️ Dừng Farming!", 2)
+    
+    if FarmingStatusLabel then
+        FarmingStatusLabel:UpdateLabel("🔴 Đã dừng")
     end
 end
 
--- ==================== CREATE GUI ====================
+-- ==================== CREATE SIMPLE GUI ====================
 local function CreateBeeZGUI()
+    -- Load Kavo UI
+    local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+    
     local Window = Library.CreateLib("🐝 BeeZ Hub v2.0", "DarkTheme")
     BeeZ_GUI = Window
     
     -- ===== MAIN TAB =====
     local MainTab = Window:NewTab("Main")
-    local MainSection = MainTab:NewSection("Main Control")
+    local MainSection = MainTab:NewSection("Điều Khiển Chính")
     
     MainSection:NewLabel("🐝 BeeZ Hub v2.0")
-    MainSection:NewLabel("Complete Farming System")
+    MainSection:NewLabel("Farm Blox Fruits Dễ Dàng")
     
-    StatusLabel = MainSection:NewLabel("Status: Ready")
+    FarmingStatusLabel = MainSection:NewLabel("🔴 Chưa farming")
     
-    MainSection:NewButton("▶️ START FARMING", "Start auto farming", function()
+    MainSection:NewButton("▶️ BẮT ĐẦU FARM", "Bắt đầu auto farm", function()
         Config.AutoFarm = true
         StartFarming()
     end)
     
-    MainSection:NewButton("⏹️ STOP FARMING", "Stop farming", function()
+    MainSection:NewButton("⏹️ DỪNG FARM", "Dừng auto farm", function()
         Config.AutoFarm = false
         StopFarming()
     end)
     
-    MainSection:NewButton("🔗 TOGGLE UI", "Show/Hide UI", function()
-        ToggleUI()
+    MainSection:NewButton("🎯 THỬ FARM (5s)", "Test farm 5 giây", function()
+        Config.AutoFarm = true
+        StartFarming()
+        task.wait(5)
+        StopFarming()
     end)
     
-    -- ===== FARMING TAB =====
-    local FarmingTab = Window:NewTab("Farming")
+    -- ===== FARMING SETTINGS TAB =====
+    local FarmingTab = Window:NewTab("Cài Đặt Farm")
     
-    local BasicFarming = FarmingTab:NewSection("Basic Farming")
-    BasicFarming:NewToggle("Enable Auto Farm", "Toggle auto farming", function(state)
-        Config.AutoFarm = state
-        Notify("Auto Farm: " .. (state and "ON" or "OFF"))
-    end)
-    
-    BasicFarming:NewDropdown("Farm Method", "Select farming method", {"Normal", "Fast", "Safe", "Boss"}, function(method)
-        Config.FarmMethod = method
-        Notify("Farm Method: " .. method)
-    end)
-    
-    BasicFarming:NewSlider("Farm Distance", "Distance to farm", 100, 10, function(value)
+    local BasicSettings = FarmingTab:NewSection("Cài Đặt Cơ Bản")
+    BasicSettings:NewSlider("Khoảng Cách Farm", "Khoảng cách tối đa", 50, 10, function(value)
         Config.FarmDistance = value
+        Notify("Khoảng cách: " .. value)
     end)
     
-    local TargetSettings = FarmingTab:NewSection("Target Settings")
-    TargetSettings:NewDropdown("Target Priority", "Select target priority", {"Nearest", "Lowest HP", "Highest Level"}, function(priority)
-        Config.FarmPriority = priority
-        Notify("Target Priority: " .. priority)
+    BasicSettings:NewDropdown("Ưu Tiên Mục Tiêu", "Chọn mục tiêu", {"Nearest", "Lowest HP"}, function(option)
+        Config.FarmPriority = option
+        Notify("Ưu tiên: " .. option)
     end)
     
-    TargetSettings:NewToggle("Stack Farming", "Farm multiple enemies", function(state)
+    local AdvancedSettings = FarmingTab:NewSection("Cài Đặt Nâng Cao")
+    AdvancedSettings:NewToggle("Stack Farming", "Farm nhiều mục tiêu", function(state)
         Config.StackFarming = state
-        Notify("Stack Farming: " .. (state and "ON" or "OFF"))
+        Notify("Stack Farming: " .. (state and "BẬT" or "TẮT"))
     end)
     
-    TargetSettings:NewSlider("Stack Count", "Max enemies to farm", 5, 1, function(value)
+    AdvancedSettings:NewSlider("Số Lượng Stack", "Số mục tiêu tối đa", 5, 1, function(value)
         Config.StackCount = value
     end)
     
-    -- ===== AUTO FEATURES TAB =====
-    local AutoTab = Window:NewTab("Auto Features")
+    -- ===== SKILL SETTINGS TAB =====
+    local SkillTab = Window:NewTab("Cài Đặt Skill")
     
-    local AutoQuest = AutoTab:NewSection("Auto Quest")
-    AutoQuest:NewToggle("Auto Katakuri Quest", "Auto accept Katakuri quest", function(state)
-        Config.AutoKatakuri = state
-        Notify("Auto Katakuri: " .. (state and "ON" or "OFF"))
-    end)
-    
-    AutoQuest:NewToggle("Auto Bone Quest", "Auto accept Bone quest", function(state)
-        Config.AutoBone = state
-        Notify("Auto Bone: " .. (state and "ON" or "OFF"))
-    end)
-    
-    AutoQuest:NewToggle("Auto Tyrant Quest", "Auto accept Tyrant quest", function(state)
-        Config.AutoTyrant = state
-        Notify("Auto Tyrant: " .. (state and "ON" or "OFF"))
-    end)
-    
-    local AutoServer = AutoTab:NewSection("Auto Server")
-    AutoServer:NewToggle("Auto Server Hop", "Auto hop servers", function(state)
-        Config.AutoHop = state
-        Notify("Auto Server Hop: " .. (state and "ON" or "OFF"))
-    end)
-    
-    AutoServer:NewSlider("Max Hop Attempts", "Maximum hops", 20, 1, function(value)
-        Config.MaxHops = value
-    end)
-    
-    -- ===== PLAYER SETTINGS TAB =====
-    local PlayerTab = Window:NewTab("Player Settings")
-    
-    local SkillSettings = PlayerTab:NewSection("Skill Settings")
-    SkillSettings:NewDropdown("Primary Skill", "Main skill to use", {"Z", "X", "C", "V", "F"}, function(skill)
+    local SkillSettings = SkillTab:NewSection("Skill Settings")
+    SkillSettings:NewDropdown("Skill Chính", "Skill sử dụng nhiều", {"Z", "X", "C", "V", "F"}, function(skill)
         Config.PrimarySkill = skill
-        Notify("Primary Skill: " .. skill)
+        Notify("Skill chính: " .. skill)
     end)
     
-    SkillSettings:NewDropdown("Secondary Skill", "Secondary skill", {"Z", "X", "C", "V", "F"}, function(skill)
+    SkillSettings:NewDropdown("Skill Phụ", "Skill hỗ trợ", {"Z", "X", "C", "V", "F"}, function(skill)
         Config.SecondarySkill = skill
-        Notify("Secondary Skill: " .. skill)
+        Notify("Skill phụ: " .. skill)
     end)
     
-    SkillSettings:NewToggle("Use Skill Combo", "Use skill combinations", function(state)
-        Config.UseSkillCombo = state
-        Notify("Skill Combo: " .. (state and "ON" or "OFF"))
-    end)
-    
-    local MasterySettings = PlayerTab:NewSection("Mastery Settings")
-    MasterySettings:NewSlider("Mastery Target", "Target mastery level", 500, 100, function(value)
-        Config.MasteryTarget = value
+    SkillSettings:NewButton("🔧 TEST SKILL", "Test skill hiện tại", function()
+        game:GetService("VirtualInputManager"):SendKeyEvent(true, Config.PrimarySkill, false, game)
+        task.wait(0.1)
+        game:GetService("VirtualInputManager"):SendKeyEvent(false, Config.PrimarySkill, false, game)
+        Notify("Test skill: " .. Config.PrimarySkill)
     end)
     
     -- ===== SAFETY TAB =====
-    local SafetyTab = Window:NewTab("Safety")
+    local SafetyTab = Window:NewTab("An Toàn")
     
-    local SafetyFeatures = SafetyTab:NewSection("Safety Features")
-    SafetyFeatures:NewToggle("Safe Mode", "Enable safe mode", function(state)
+    local SafetySettings = SafetyTab:NewSection("Cài Đặt An Toàn")
+    SafetySettings:NewToggle("Chế Độ An Toàn", "Giảm nguy cơ bị ban", function(state)
         Config.SafeMode = state
-        Notify("Safe Mode: " .. (state and "ON" or "OFF"))
+        Notify("Safe mode: " .. (state and "BẬT" or "TẮT"))
     end)
     
-    SafetyFeatures:NewToggle("Anti-AFK", "Prevent AFK kick", function(state)
+    SafetySettings:NewToggle("Chống AFK", "Tự động chống AFK", function(state)
         Config.AntiAfk = state
-        Notify("Anti-AFK: " .. (state and "ON" or "OFF"))
-    end)
-    
-    SafetyFeatures:NewToggle("Humanizer", "Human-like behavior", function(state)
-        Config.Humanizer = state
-        Notify("Humanizer: " .. (state and "ON" or "OFF"))
-    end)
-    
-    local TimeSettings = SafetyTab:NewSection("Time Settings")
-    TimeSettings:NewToggle("Random Breaks", "Take random breaks", function(state)
-        Config.RandomBreaks = state
-        Notify("Random Breaks: " .. (state and "ON" or "OFF"))
-    end)
-    
-    TimeSettings:NewSlider("Farm Time Limit", "Max farming time", 3600, 300, function(value)
-        Config.FarmTimeLimit = value
-        local minutes = math.floor(value / 60)
-        Notify("Time Limit: " .. minutes .. " minutes")
+        Notify("Anti-AFK: " .. (state and "BẬT" or "TẮT"))
     end)
     
     -- ===== TELEPORT TAB =====
-    local TeleportTab = Window:NewTab("Teleport")
+    local TeleportTab = Window:NewTab("Di Chuyển")
     
-    local TeleportLocations = TeleportTab:NewSection("Teleport Locations")
-    TeleportLocations:NewButton("Safe Zone", "Teleport to safe spot", function()
+    local TeleportSettings = TeleportTab:NewSection("Teleport Nhanh")
+    TeleportSettings:NewButton("🏝️ Ra Đảo Gần Nhất", "Tìm đảo gần nhất", function()
+        local islands = {}
+        for _, part in pairs(Workspace:GetChildren()) do
+            if string.find(part.Name:lower(), "island") or string.find(part.Name:lower(), "sea") then
+                table.insert(islands, part)
+            end
+        end
+        
+        if #islands > 0 then
+            HumanoidRootPart.CFrame = islands[1].CFrame + Vector3.new(0, 10, 0)
+            Notify("Đã teleport đến đảo")
+        else
+            Notify("Không tìm thấy đảo!")
+        end
+    end)
+    
+    TeleportSettings:NewButton("🛡️ Vùng An Toàn", "Teleport lên cao", function()
         HumanoidRootPart.CFrame = CFrame.new(0, 100, 0)
-        Notify("Teleported to Safe Zone")
+        Notify("Đã đến vùng an toàn")
     end)
     
-    TeleportLocations:NewButton("Island 1", "Teleport to island", function()
-        Notify("Teleporting...")
+    TeleportSettings:NewButton("🏰 Castle on the Sea", "Đến Castle", function()
+        HumanoidRootPart.CFrame = CFrame.new(-5000, 100, 500)
+        Notify("Đang đến Castle...")
     end)
     
-    -- ===== MISC TAB =====
-    local MiscTab = Window:NewTab("Misc")
+    -- ===== HƯỚNG DẪN TAB =====
+    local HelpTab = Window:NewTab("Hướng Dẫn")
     
-    local Utility = MiscTab:NewSection("Utility")
-    Utility:NewButton("Refresh Character", "Reset character", function()
-        Character:BreakJoints()
-        Notify("Refreshing character...")
-    end)
+    local HelpSection = HelpTab:NewSection("📖 HƯỚNG DẪN SỬ DỤNG")
+    HelpSection:NewLabel("CÁCH FARM:")
+    HelpSection:NewLabel("1. Vào Main tab")
+    HelpSection:NewLabel("2. Nhấn ▶️ BẮT ĐẦU FARM")
+    HelpSection:NewLabel("3. Nhấn ⏹️ DỪNG FARM khi cần")
     
-    local Settings = MiscTab:NewSection("Settings")
-    Settings:NewToggle("Notifications", "Enable notifications", function(state)
-        Config.Notifications = state
-        Notify("Notifications: " .. (state and "ON" or "OFF"))
-    end)
+    HelpSection:NewLabel("")
+    HelpSection:NewLabel("TOGGLE UI:")
+    HelpSection:NewLabel("• Click icon 🐝 góc trái")
+    HelpSection:NewLabel("• Hoặc nhấn phím F8")
     
-    Settings:NewButton("Save Config", "Save settings", function()
-        Notify("Settings saved!")
-    end)
+    HelpSection:NewLabel("")
+    HelpSection:NewLabel("HOTKEYS:")
+    HelpSection:NewLabel("F9 = Bật/Tắt Farm")
+    HelpSection:NewLabel("F8 = Bật/Tắt UI")
     
     return Window
 end
 
 -- ==================== INITIALIZATION ====================
-CreateToggleIcon()
+-- Tạo icon toggle
+CreateSimpleToggleIcon()
+
+-- Tạo GUI
 CreateBeeZGUI()
 
-Notify("🐝 BeeZ Hub v2.0 loaded!\n• Click 🐝 icon to toggle UI\n• Press F9 to toggle Farm", 5)
+-- Thông báo
+Notify("🐝 BeeZ Hub v2.0 Đã Sẵn Sàng!", 3)
+Notify("Click icon 🐝 để bật/tắt UI", 3)
+Notify("Nhấn F9 để bật/tắt Farm nhanh", 3)
 
 -- Hotkeys
-game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed then
         if input.KeyCode == Enum.KeyCode.F9 then
+            -- Toggle Farm
             Config.AutoFarm = not Config.AutoFarm
             if Config.AutoFarm then
                 StartFarming()
@@ -479,27 +417,25 @@ game:GetService("UserInputService").InputBegan:Connect(function(input, gameProce
                 StopFarming()
             end
         elseif input.KeyCode == Enum.KeyCode.F8 then
+            -- Toggle UI
             ToggleUI()
         end
     end
 end)
 
 print("========================================")
-print("🐝 BEEZ HUB v2.0 - COMPLETE FARMING")
+print("🐝 BEEZ HUB v2.0 - ĐÃ SẴN SÀNG!")
 print("========================================")
-print("Features:")
-print("- Auto Farming System")
-print("- Stack Farming")
-print("- Target Priority")
-print("- Auto Quest System")
-print("- Auto Server Hop")
-print("- Skill Management")
-print("- Safety Features")
-print("- Teleport System")
-print("- Toggle UI Icon 🐝")
+print("CÁCH DÙNG:")
+print("1. Nhấn ▶️ BẮT ĐẦU FARM trong Main tab")
+print("2. Icon 🐝 góc trái: Bật/Tắt UI")
+print("3. F9 = Bật/Tắt Farm nhanh")
+print("4. F8 = Bật/Tắt UI nhanh")
 print("========================================")
-print("Hotkeys:")
-print("F9 - Toggle Farming")
-print("F8 - Toggle UI")
-print("Click 🐝 icon - Toggle UI")
+print("TÍNH NĂNG HOẠT ĐỘNG:")
+print("- Auto farm quái trong phạm vi")
+("- Dùng skill Z, X tự động")
+print("- Stack farming (nhiều mục tiêu)")
+print("- Teleport nhanh")
+print("- Anti-AFK")
 print("========================================")
