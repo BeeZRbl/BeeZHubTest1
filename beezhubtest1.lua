@@ -46,7 +46,7 @@ nameHub.Parent = playerGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Parent = nameHub
-mainFrame.Size = UDim2.new(0.28, 0, 0.19, 0) -- NHỎ LẠI
+mainFrame.Size = UDim2.new(0.3, 0, 0.18, 0) -- NHỎ LẠI
 mainFrame.Position = UDim2.new(0.36, 0, 0.05, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BackgroundTransparency = 0.15
