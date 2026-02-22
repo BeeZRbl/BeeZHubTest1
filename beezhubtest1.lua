@@ -46,8 +46,8 @@ nameHub.Parent = playerGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Parent = nameHub
-mainFrame.Size = UDim2.new(0.32, 0, 0.22, 0) -- Tăng chiều cao
-mainFrame.Position = UDim2.new(0.34, 0, 0.05, 0)
+mainFrame.Size = UDim2.new(0.28, 0, 0.19, 0) -- NHỎ LẠI
+mainFrame.Position = UDim2.new(0.36, 0, 0.05, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BackgroundTransparency = 0.15
 mainFrame.BorderSizePixel = 0
@@ -144,24 +144,24 @@ saveLabel.TextScaled = true
 saveLabel.Font = Enum.Font.GothamBold
 saveLabel.TextColor3 = Color3.new(1,1,1)
 
--- ===== BALANCED TOGGLE =====
+-- TOGGLE nhỏ lại theo UI
 
 local toggle = Instance.new("Frame", settingPage)
-toggle.Size = UDim2.new(0,70,0,32)
-toggle.Position = UDim2.new(0.72,0,0.25,-16)
+toggle.Size = UDim2.new(0,60,0,28)
+toggle.Position = UDim2.new(0.72,0,0.25,-14)
 toggle.BackgroundColor3 = Color3.fromRGB(50,50,50)
 Instance.new("UICorner", toggle).CornerRadius = UDim.new(1,0)
 
 local circle = Instance.new("Frame", toggle)
-circle.Size = UDim2.new(0,26,0,26)
-circle.Position = UDim2.new(0,3,0.5,-13)
+circle.Size = UDim2.new(0,22,0,22)
+circle.Position = UDim2.new(0,3,0.5,-11)
 circle.BackgroundColor3 = Color3.fromRGB(255,140,0)
 Instance.new("UICorner", circle).CornerRadius = UDim.new(1,0)
 
 local saved = savedData.Toggle
 
 if saved then
-	circle.Position = UDim2.new(1,-29,0.5,-13)
+	circle.Position = UDim2.new(1,-25,0.5,-11)
 	jobBox.TextEditable = false
 end
 
@@ -171,11 +171,11 @@ toggle.InputBegan:Connect(function(input)
 		savedData.Toggle = saved
 		
 		if saved then
-			circle:TweenPosition(UDim2.new(1,-29,0.5,-13),"Out","Quad",0.2,true)
+			circle:TweenPosition(UDim2.new(1,-25,0.5,-11),"Out","Quad",0.2,true)
 			jobBox.TextEditable = false
 			savedData.Text = jobBox.Text
 		else
-			circle:TweenPosition(UDim2.new(0,3,0.5,-13),"Out","Quad",0.2,true)
+			circle:TweenPosition(UDim2.new(0,3,0.5,-11),"Out","Quad",0.2,true)
 			jobBox.TextEditable = true
 		end
 		
